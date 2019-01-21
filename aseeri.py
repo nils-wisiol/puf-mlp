@@ -6,15 +6,15 @@ from sklearn.neural_network import MLPClassifier
 
 def generate_challenges(n, N):
     size = n * N
-    print("generating %i %i-bit challenges, that's about %.1fMB (one byte per challenge bit)" %
-          (N, n, size / 1024**2))
+    # print("generating %i %i-bit challenges, that's about %.1fMB (one byte per challenge bit)" %
+    #       (N, n, size / 1024**2))
 
     return 2 * np.random.randint(0, 2, (N, n), dtype=np.int8) - 1
 
 
 def transform_id(challenges, k):
     (N, n) = challenges.shape
-    print("transforming with identity function from %s to %s, using no additional memory" % ((N, n), (N, k, n)))
+    # print("transforming with identity function from %s to %s, using no additional memory" % ((N, n), (N, k, n)))
     return np.transpose(np.broadcast_to(challenges, (k, N, n)), axes=(1, 0, 2))
 
 
@@ -24,11 +24,12 @@ def accuracy(a, b, N=1000):
 
 
 def mlp_learn_xor_arbiter_puf(n, N, k):
-    print("running MLP on simulated XOR Arbiter PUF for (N, k, n) = %s" % ((N, k, n),))
-    print("max memory usage should be about %3.2fGB, that's" % (((n * N) + (N * k * 8) + (N * 8)) / 1024 ** 3))
-    print("- raw challenges:       % 3.2f GB, O(nN) " % ((n * N) / 1024 ** 3))
-    print("- individual responses: % 3.2f GB, O(8Nk)" % ((N * k * 8) / 1024 ** 3))
-    print("- combined responses:   % 3.2f GB, O(8N)" % ((N * 8) / 1024 ** 3))
+    est_total_memory = ((n * N) + (N * k * 8) + (N * 8)) / 1024 ** 3
+    # print("running MLP on simulated XOR Arbiter PUF for (N, k, n) = %s" % ((N, k, n),))
+    # print("max memory usage should be about %3.2fGB, that's" % est_total_memory)
+    # print("- raw challenges:       % 3.2f GB, O(nN) " % ((n * N) / 1024 ** 3))
+    # print("- individual responses: % 3.2f GB, O(8Nk)" % ((N * k * 8) / 1024 ** 3))
+    # print("- combined responses:   % 3.2f GB, O(8N)" % ((N * 8) / 1024 ** 3))
 
     challenges = generate_challenges(n, N)
     transformed_challenges = transform_id(challenges, k)
@@ -42,7 +43,7 @@ def mlp_learn_xor_arbiter_puf(n, N, k):
     responses = np.sign(eval_step_2)
     del eval_step_2
 
-    print("starting learner")
+    # print("starting learner")
     start = time()
     clf = MLPClassifier(
         solver='adam',
@@ -54,14 +55,15 @@ def mlp_learn_xor_arbiter_puf(n, N, k):
         shuffle=False,
     )
     clf.partial_fit(challenges, responses, classes=[-1, 1])
-    print("learned one iteration in %.2fs, accuracy %.3f" % (
+    print("%.2fs %.3f %.1f" % (
         time() - start,
         accuracy(
             lambda cs: np.sign(
-                np.prod(np.einsum('ji,...ji->...j', weights, transform_fixed_permutation(cs, k), optimize=True),
+                np.prod(np.einsum('ji,...ji->...j', weights, transform_id(cs, k), optimize=True),
                         axis=1)),
             lambda cs: clf.predict(cs)
-        )
+        ),
+        est_total_memory
     ))
 
 
